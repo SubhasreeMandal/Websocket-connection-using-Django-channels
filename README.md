@@ -104,6 +104,7 @@ View function or class takes an HTTP request object as input (usually called req
 The function of websocket_status.html is to serve as the client-side interface for establishing and managing a real-time WebSocket connection with the Django Channels server.
    
 
-
+## Future Scope
+Useful for building real-time features like chat apps, notifications, or live updates.
 
   
