@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WebSocket Status</title>
+<style>
+    /* Reset and base */
+    * {
+        box-sizing: border-box;
+    }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: #fff;
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .container {
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 12px;
+        width: 400px;
+        max-width: 90vw;
+        padding: 20px 30px 30px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    h1 {
+        font-weight: 700;
+        font-size: 1.5rem;
+        margin: 0 0 10px 0;
+        text-align: center;
+        user-select: none;
+    }
+    #status {
+        font-weight: 900;
+        font-size: 1.6rem;
+        padding: 4px 12px;
+        border-radius: 20px;
+        display: inline-block;
+        min-width: 130px;
+        text-align: center;
+        user-select: none;
+        transition: background-color 0.3s ease;
+    }
+    /* Status colors */
+    #status.disconnected {
+        background-color: #e53e3e;
+        color: #fff;
+    }
+    #status.connecting {
+        background-color: #dd6b20;
+        color: #fff;
+    }
+    #status.connected {
+        background-color: #38a169;
+        color: #fff;
+    }
+
+    /* Buttons */
+    .btn-group {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+    }
+    button {
+        background: #5a67d8;
+        border: none;
+        color: white;
+        font-weight: 600;
+        padding: 12px 20px;
+        border-radius: 30px;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: background-color 0.25s ease, box-shadow 0.25s ease;
+        user-select: none;
+        flex: 1;
+        min-width: 100px;
+    }
+    button:disabled {
+        background: #a0aec0;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+    button:not(:disabled):hover {
+        background: #434190;
+        box-shadow: 0 4px 12px rgba(67, 65, 144, 0.6);
+    }
+
+    /* Message input and send */
+    .input-group {
+        display: flex;
+        gap: 10px;
+    }
+    #messageInput {
+        flex: 1;
+        padding: 12px 15px;
+        font-size: 1rem;
+        border-radius: 30px;
+        border: none;
+        outline: none;
+        transition: box-shadow 0.3s ease;
+    }
+    #messageInput:focus:not(:disabled) {
+        box-shadow: 0 0 8px 2px #5a67d8;
+    }
+    #messageInput:disabled {
+        background: #2d3748;
+        color: #718096;
+        cursor: not-allowed;
+    }
+
+    /* Messages container */
+    #messages {
+        background: #1a202c;
+        border-radius: 12px;
+        height: 250px;
+        overflow-y: auto;
+        padding: 15px 20px;
+        font-size: 0.95rem;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        user-select: text;
+    }
+    #messages p {
+        background: #4c51bf;
+        margin: 8px 0;
+        padding: 10px 15px;
+        border-radius: 18px;
+        max-width: 80%;
+        word-wrap: break-word;
+        box-shadow: 0 2px 8px rgba(76, 81, 191, 0.4);
+        animation: fadeIn 0.4s ease forwards;
+    }
+
+    /* Scrollbar styling */
+    #messages::-webkit-scrollbar {
+        width: 8px;
+    }
+    #messages::-webkit-scrollbar-track {
+        background: #2d3748;
+        border-radius: 12px;
+    }
+    #messages::-webkit-scrollbar-thumb {
+        background: #5a67d8;
+        border-radius: 12px;
+    }
+
+    /* Fade in animation */
+    @keyframes fadeIn {
+        from {opacity: 0; transform: translateY(10px);}
+        to {opacity: 1; transform: translateY(0);}
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Connection Status: <span id="status" class="disconnected">Disconnected</span></h1>
+    
+    <div class="btn-group">
+        <button id="connect-button">Connect WebSocket</button>
+        <button id="disconnect-button" disabled>Disconnect WebSocket</button>
+    </div>
+    
+    <div class="input-group">
+        <input type="text" id="messageInput" placeholder="Type your message..." disabled autocomplete="off" />
+        <button id="send-button" disabled>Send</button>
+    </div>
+    
+    <div id="messages" aria-live="polite" aria-atomic="true"></div>
+</div>
+
+<script>
+    let socket = null;
+
+    const statusSpan = document.getElementById('status');
+    const connectBtn = document.getElementById('connect-button');
+    const disconnectBtn = document.getElementById('disconnect-button');
+    const sendBtn = document.getElementById('send-button');
+    const messageInput = document.getElementById('messageInput');
+    const messagesDiv = document.getElementById('messages');
+
+    function setStatus(text, state) {
+        statusSpan.textContent = text;
+        statusSpan.className = ''; // reset classes
+        if (state === 'connected') {
+            statusSpan.classList.add('connected');
+        } else if (state === 'connecting') {
+            statusSpan.classList.add('connecting');
+        } else {
+            statusSpan.classList.add('disconnected');
+        }
+    }
+
+    function addMessage(message) {
+        const messageElement = document.createElement('p');
+        messageElement.textContent = message;
+        messagesDiv.appendChild(messageElement);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight; // auto scroll to bottom
+    }
+
+    connectBtn.addEventListener('click', () => {
+        if (socket !== null && socket.readyState === WebSocket.OPEN) {
+            console.log('WebSocket already connected');
+            return;
+        }
+
+        socket = new WebSocket('ws://' + window.location.host + '/ws/chat/');
+
+        setStatus('Connecting...', 'connecting');
+
+        socket.onopen = () => {
+            setStatus('Connected', 'connected');
+            console.log('WebSocket connection established');
+
+            disconnectBtn.disabled = false;
+            sendBtn.disabled = false;
+            messageInput.disabled = false;
+            connectBtn.disabled = true;
+
+            addMessage('** CONNECTION_ESTABLISHED **');
+        };
+
+        socket.onclose = () => {
+            setStatus('Disconnected', 'disconnected');
+            console.log('WebSocket connection closed');
+
+            disconnectBtn.disabled = true;
+            sendBtn.disabled = true;
+            messageInput.disabled = true;
+            connectBtn.disabled = false;
+
+            addMessage('** Connection closed by server or client **');
+        };
+
+        socket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            addMessage('** WebSocket error occurred **');
+        };
+
+        socket.onmessage = (event) => {
+            console.log('Received message:', event.data);
+            addMessage(event.data);
+        };
+    });
+
+    disconnectBtn.addEventListener('click', () => {
+        if (socket) {
+            socket.close();
+        }
+    });
+
+    sendBtn.addEventListener('click', () => {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            const message = messageInput.value.trim();
+            if (message) {
+                socket.send(message);
+                messageInput.value = '';
+            }
+        } else {
+            alert('WebSocket is not connected.');
+        }
+    });
+
+    messageInput.addEventListener('keyup', (event) => {
+        if (event.key === 'Enter') {
+            sendBtn.click();
+        }
+    });
+</script>
+</body>
+</html>

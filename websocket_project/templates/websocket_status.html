@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Status</title>
+    <script>
+        const socket = new WebSocket('ws://' + window.location.host + '/ws/chat/');
+        
+        socket.onopen = () => {
+            document.getElementById('status').textContent = 'Connected';
+            document.getElementById('status').style.color = 'green';
+        };
+        
+        socket.onclose = () => {
+            document.getElementById('status').textContent = 'Disconnected';
+            document.getElementById('status').style.color = 'red';
+        };
+        
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            socket.send(input.value);
+            input.value = '';
+        }
+    </script>
+</head>
+<body>
+    <h1>Connection Status: <span id="status">Connecting...</span></h1>
+    <input type="text" id="messageInput" placeholder="Type message">
+    <button onclick="sendMessage()">Send</button>
+    <div id="messages"></div>
+</body>
+</html>
